@@ -52,6 +52,41 @@ def calculate_perplexity(sentences, probabilities, n):
             token_count += 1
     return 2 ** (-log_prob_sum / token_count)
 
+# Functions used for part 2 smoothing 
+def calculate_probabilities_withLaplaceSmoothing(model, vocab_size, smoothing=1):
+    probabilities = {}
+
+    for ngram, next_tokens in model.items():
+        total_count = sum(next_tokens.values()) + smoothing * vocab_size  # Additive smoothing adjustment
+        probabilities[ngram] = {token: (count + smoothing) / total_count for token, count in next_tokens.items()}
+
+    return probabilities
+# Calculate perplexity with lazy smoothing
+def calculate_perplexity_with_smoothing(sentences, probabilities, n, vocab_size, smoothing=1):
+    log_prob_sum = 0
+    token_count = 0
+
+    for sentence in sentences:
+        sentence = ['<START>'] * (n - 1) + sentence  # Add <START> tokens for bigram and trigram models
+        for i in range(n - 1, len(sentence)):
+            ngram = tuple(sentence[i - n + 1:i])
+            next_token = sentence[i]
+
+            # Retrieve probability with lazy smoothing
+            if ngram in probabilities and next_token in probabilities[ngram]:
+                probability = probabilities[ngram][next_token]
+            else:
+                # Apply Laplace smoothing for unseen n-grams
+                total_count = sum(probabilities.get(ngram, {}).values()) + smoothing * vocab_size
+                probability = smoothing / total_count
+
+            log_prob_sum += math.log2(probability)
+            token_count += 1
+
+    return 2 ** (-log_prob_sum / token_count)
+
+# _______________________________________________________________end of part 2 functions______________________________________________________________
+
 # Step 5: Run experiments and report results
 def main():
     # Load data
@@ -61,6 +96,7 @@ def main():
 
     # Preprocess data
     train_sentences, vocab = preprocess_data(train_sentences)
+    vocab_size = len(vocab)
     dev_sentences, _ = preprocess_data(dev_sentences)
     test_sentences, _ = preprocess_data(test_sentences)
 
@@ -69,9 +105,14 @@ def main():
         model = build_ngram_model(train_sentences, n)
         probabilities = calculate_probabilities(model)
         
-        train_perplexity = calculate_perplexity(train_sentences, probabilities, n)
-        dev_perplexity = calculate_perplexity(dev_sentences, probabilities, n)
-        test_perplexity = calculate_perplexity(test_sentences, probabilities, n)
+        # train_perplexity = calculate_perplexity(train_sentences, probabilities, n)
+        # dev_perplexity = calculate_perplexity(dev_sentences, probabilities, n)
+        # test_perplexity = calculate_perplexity(test_sentences, probabilities, n)
+
+
+        train_perplexity = calculate_perplexity_with_smoothing(train_sentences, probabilities,n,vocab_size)
+        dev_perplexity = calculate_perplexity_with_smoothing(dev_sentences, probabilities, n,vocab_size)
+        test_perplexity = calculate_perplexity_with_smoothing(test_sentences, probabilities, n,vocab_size)
         
         print(f'{n}-gram Model Perplexity:')
         print(f'  Train: {train_perplexity}')
